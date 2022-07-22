@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jul 22 12:47:06 2022
+
+@author: theautisticmagician
+"""
+
+import tkinter
+from tkinter import filedialog
+import numpy as np
+from PIL import Image
+#STATIC,easier changes down the line, error handling might follow later, colours via numpy
+FONT_NAME = "Courier"
+rgb_amount = -30
+#ToDo: Filter extreme white or black shades, create colour as img output
+
+#bttn function
+def getcol():
+    path = filedialog.askopenfilename()
+    img = Image.open(path)
+    img_array = np.array(img)
+    avg_RGB = (np.rint(img_array[:,:,0].mean()),np.rint(img_array[:,:,1].mean()),np.rint(img_array[:,:,2].mean()))
+    #reshape RGB first then size, get RGBs and their counts
+    rgbfirst_array = img_array.reshape(-1,3)
+    rgb_vals, val_counts = np.unique(rgbfirst_array, axis=0, return_counts=True)
+    #get indexes of 10 biggest values, maybe reduce comp time further somehow
+    index = np.argpartition(val_counts,rgb_amount)[rgb_amount:]
+    #sort inside of smaller array to reduce comp-time as argsort will be used
+    highest_counts = val_counts[index]
+    highest_rgb = rgb_vals[index]
+    postreduction_index = np.argpartition(highest_counts,rgb_amount)
+    sorted_postred_index = postreduction_index[np.argsort(highest_counts[postreduction_index])][-1:0:-1]
+    sorted_highest_rgb = highest_rgb[sorted_postred_index]
+    #for now output txt, mostly unformatted
+    with open(f"colorinfo{rgb_amount*-1}.txt", "w") as f:
+        f.write(f"average RGB : {avg_RGB}\n")
+        f.write(np.array2string(sorted_highest_rgb))
+
+
+    
+    
+#Mini-UI
+window = tkinter.Tk()
+window.title("Colour Palette Generator")
+window.config(padx = 10, pady = 10)
+#label
+ttl_lbl = tkinter.Label(text = "Palette Generator", font=(FONT_NAME,25))
+ttl_lbl.grid(column = 1, row = 0)
+#tutorial
+tut_lbl = tkinter.Label(text = "Click select, and select your image", font=(FONT_NAME,12))
+tut_lbl.grid(column = 1, row = 1)
+
+#select button
+slct_bttn = tkinter.Button(text="select", highlightthickness=0, command = getcol)
+slct_bttn.grid(column = 1, row = 2)
+
+
+#submit button, deemed as unnecessary one button can do all functions just fine less clutter
+# sbmt_bttn = tkinter.Button(text="Submit", highlightthickness=0)
+# sbmt_bttn.grid(column = 2, row = 3)
+
+#maybe add rgb_amount to user interface
+window.mainloop()
