@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Jul 23 11:23:34 2022
+
+@author: theautisticmagician
+
+Goal is to do some multivar regression and see if something can be determined on the dataset whether that extrapolates into the future
+is an absolutely different question as dynamic systems are being observed; humans, economies/economics.
+
+This Version also only looks at a subset, might repeat later on a full set
+"""
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
+
+#import the data
+df = pd.read_csv("NLSY97_subset.csv")
+df_desc = pd.read_csv("NLSY97_Variable_Names_and_Descriptions.csv")
+
+#After looking at dfs it appears there are non-sense duplicates, ID the same as well as all values attached to them;testing
+dupcheck_truecount = df.duplicated().value_counts().loc[1]
+if dupcheck_truecount >0:
+    df.drop_duplicates(inplace = True)
+    
+#drop all completely empty rows from desc
+df_desc.dropna(axis = 0, how = "all", inplace = True)
+
+#check earnings as a dependable var 1. remove nans 2. impute them
+#1 remove nane
+df_nonans = df.dropna()
+y_no = df_nonans["EARNINGS"]
+X_no = df_nonans.iloc[:, 2:]
+
+earnings_reg = LinearRegression().fit(X_no,y_no)
+earnings_coefs = earnings_reg.coef_
+nonans_coef_df = pd.DataFrame(data = earnings_coefs,index = X_no.columns, columns= ["coef"])
+#dertmination coeffcient on own dataset
+dropped_nans_score = earnings_reg.score(X_no,y_no)
+
+# earnings_nan_plot = sns.pairplot(
+#     data=df_nonans,
+#     y_vars=["EARNINGS"],
+#     kind = "reg"
+#     )
+
+# earnings_nan_plot.figure.savefig("test.png")
+
+#/1
+
+#2 Multivariate imputation
+imputer = IterativeImputer(max_iter=10, random_state = 0, initial_strategy="median")
+
+y = df["EARNINGS"]
+X = df.iloc[:, 2:]
+imputer.fit(X,y)
+
+imputed_X = pd.DataFrame(imputer.transform(X), columns= X.columns)
+imputed_df = pd.merge(df["EARNINGS"],imputed_X, left_index=True, right_index = True)
+imputed_df.to_csv("imputed_df.csv")
+
+earnings_reg_im = LinearRegression().fit(imputed_X,y)
+earnings_coefs_im = earnings_reg_im.coef_
+nonans_coef_df_im = pd.DataFrame(data = earnings_coefs_im,index = X.columns, columns= ["coef"])
+#dertmination coeffcient on own dataset
+imputed_nans_score = earnings_reg_im.score(imputed_X,y)
+#det coeff on dropped nans dataset
+imputed_vs_score = earnings_reg_im.score(X_no,y_no)
+
+print(f"coefficient of Determination:\n Dropped Nans Dataset\n droppednanreg :{dropped_nans_score} v. {imputed_vs_score} imputednanreg\n imputednanreg on own dataset: {imputed_nans_score}")
