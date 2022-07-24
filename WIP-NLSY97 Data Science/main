@@ -8,15 +8,17 @@ Created on Sat Jul 23 11:23:34 2022
 Goal is to do some multivar regression and see if something can be determined on the dataset whether that extrapolates into the future
 is an absolutely different question as dynamic systems are being observed; humans, economies/economics.
 
-This Version also only looks at a subset, might repeat later on a full set
+This Version also only looks at a subset, might repeat later on a full set, no splitting of data as of now as prediction isn't the goal
+but rather analyzing the data.
 """
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.experimental import enable_iterative_imputer
-from sklearn.impute import IterativeImputer
+from sklear.model_selection import train_test_split
+# from sklearn.experimental import enable_iterative_imputer
+# from sklearn.impute import IterativeImputer
 
 #import the data
 df = pd.read_csv("NLSY97_subset.csv")
@@ -51,7 +53,7 @@ dropped_nans_score = earnings_reg.score(X_no,y_no)
 # earnings_nan_plot.figure.savefig("test.png")
 
 #/1
-
+''' Put on hold till idea about better performance, argmax of all mutually exclusive options as 1 rest 0?
 #2 Multivariate imputation
 imputer = IterativeImputer(max_iter=10, random_state = 0, initial_strategy="median")
 
@@ -72,3 +74,4 @@ imputed_nans_score = earnings_reg_im.score(imputed_X,y)
 imputed_vs_score = earnings_reg_im.score(X_no,y_no)
 
 print(f"coefficient of Determination:\n Dropped Nans Dataset\n droppednanreg :{dropped_nans_score} v. {imputed_vs_score} imputednanreg\n imputednanreg on own dataset: {imputed_nans_score}")
+'''
