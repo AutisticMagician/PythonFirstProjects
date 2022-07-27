@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jul 21 12:14:16 2022
+
+@author: theautisticmagician
+"""
+#clean up follows later
+import torch
+import torch.nn as nn
+import numpy as np
+import matplotlib.pyplot as plt
+import idx2numpy
+#load data
+file_list = ["./MNIST/t10k-images.idx3-ubyte","./MNIST/t10k-labels.idx1-ubyte","./MNIST/train-images.idx3-ubyte","./MNIST/train-labels.idx1-ubyte" ]
+
+key_list = ["testset","testsetlabels","trainset","trainsetlabels" ]
+
+data_dic = {key_list[i]:idx2numpy.convert_from_file(file_list[i]) for i in range(4)}
+
+#model will be squeezed due to hardware constraints.....
+def model_builder(x,y,lrate):
+    ANNclassify = nn.Sequential(
+        nn.Linear(x,x//16),
+        nn.ReLU(),
+        nn.Linear(x//16,x//16),
+        nn.ReLU(),
+        nn.Linear(x//16,x//16),
+        nn.ReLU(),
+        nn.Linear(x//16,x//16),
+        nn.ReLU(),
+        nn.Linear(x//16,y)
+        )
+    
+    lossfun=nn.CrossEntropyLoss()
+    optim = torch.optim.SGD(ANNclassify.parameters(),lr=lrate)
+    
+    return ANNclassify, lossfun, optim
+
+
+
+def model_trainer(data,labels,epochs,ANNclassify, lossfun, optim):
+    losses = torch.zeros(epochs)
+    for i in range(epochs):
+        print(f"Round {i+1} starting")
+        #get predictions
+        yhat = ANNclassify(data)
+        #calc loss and store it for plotting
+        loss = lossfun(yhat,labels)
+        losses[i] = loss
+        
+        #backwards prop and clean up
+        optim.zero_grad()
+        loss.backward()
+        optim.step()
+        
+    predictions = torch.argmax(ANNclassify(data), axis =1)
+    acc = torch.mean((labels==predictions).float())
+    print(acc)
+    error_chart = plt.plot(losses.detach())
+    plt.xlabel("Training Round")
+    plt.ylabel("Losses")
+    plt.title(f"Accuracy {acc.detach()}")
+    plt.savefig("Losses training data")
+#fitted a bit for data set
+def tensorize_and_flatten(array,labels):
+    data = torch.flatten(torch.tensor(array).float(),start_dim =1)
+    inputsize = data.size(dim=1)
+    labels = torch.tensor(labels)
+    arg_list = torch.unique(labels).long()
+    arg_num = arg_list.size(dim=0)
+    x = data.size(dim=0)
+    y = labels.size(dim=0)
+    if x==y:
+        return data,inputsize, labels, arg_num
+    else:
+        raise Exception("Set size does not match label size")
+
+
+trainingset, inputsize, labels,arg_num = tensorize_and_flatten(data_dic["trainset"],data_dic["trainsetlabels"])
+
+ANNclassify, lossfun, optim = model_builder(inputsize,arg_num,lrate=0.01)
+
+model_trainer(trainingset,labels,100,ANNclassify, lossfun, optim)
+
+#now check on testdata
+testset, x, testlabels, y = tensorize_and_flatten(data_dic["testset"], data_dic["testsetlabels"])
+prob_list = ANNclassify(testset)
+predictions = torch.argmax(prob_list, axis =1)
+acc = torch.mean((testlabels==predictions).float())
+
+# super ugly
+# test_plot = plt.plot(prob_list.detach(), "-s", markerfacecolor="w")
+# plt.xlabel('label nr')
+# plt.ylabel('Probability')
+# plt.legend(["0","1","2","3","4","5","6","7","8","9"])
+# plt.title(f"final acc:{acc.detach()}")
+
+
+
