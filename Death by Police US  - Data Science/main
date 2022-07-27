@@ -106,6 +106,52 @@ fat_byrace_chart.write_html("fat by race.html")
 
 fat_bygender_chart= px.pie(fat_bygender,values=fat_bygender, names=fat_bygender.index, title ="Fatality share by gender")
 fat_bygender_chart.write_html("fat by gender.html")
+#find USA-wide ethnicity share
+global_eth_share = ethnic_distribution.mean()
+global_eth_share_chart = px.pie(global_eth_share, values=global_eth_share,names = global_eth_share.index,title="USA wide ethn share per data")
+global_eth_share_chart.write_html("global eth share.html")
+
+#merging ethnicity and fat by eth to set them in relation
+fat_byrace.index = ["share_white","share_black", "share_hispanic", "share_asian", "share_native_american", "Other"] 
+byrace_merged = pd.merge(fat_byrace.rename("Fatality by race"),global_eth_share.rename("Share of ethnicity"),left_index=True,right_index=True)  
+byrace_merged["Share Fatalities"] = byrace_merged["Fatality by race"]/byrace_merged["Fatality by race"].sum()
+#P(E|F) is missing P(F) as currently no absolute value of population, therefore no further integration/testing
+
+
+#Police killing and State
+fat_bystate = df_fatalities["state"].value_counts()
+
+poverty_and_fats = rel_poverty.merge(fat_bystate.rename("fatalities"), left_index=True, right_index=True)
+
+poverty_and_fats_chart = sns.jointplot(x=poverty_and_fats["poverty_rate"],y=poverty_and_fats["fatalities"], kind="kde")
+poverty_and_fats_chart.set_axis_labels("Poverty rate","Nr. Fatalities" )
+poverty_and_fats_chart.fig.savefig("KDE Poverty Rate and Fats")
+
+#Killings over time is an idea, but requires abs pop values, as the killing rate might stay the same even with increasing kill numbers if population growth >0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
