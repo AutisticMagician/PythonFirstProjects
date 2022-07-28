@@ -11,6 +11,7 @@ import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
 import idx2numpy
+import seaborn as sns
 #load data
 file_list = ["./MNIST/t10k-images.idx3-ubyte","./MNIST/t10k-labels.idx1-ubyte","./MNIST/train-images.idx3-ubyte","./MNIST/train-labels.idx1-ubyte" ]
 
@@ -21,15 +22,15 @@ data_dic = {key_list[i]:idx2numpy.convert_from_file(file_list[i]) for i in range
 #model will be squeezed due to hardware constraints.....
 def model_builder(x,y,lrate):
     ANNclassify = nn.Sequential(
-        nn.Linear(x,x//16),
+        nn.Linear(x,x//8),
         nn.ReLU(),
-        nn.Linear(x//16,x//16),
+        nn.Linear(x//8,x//8),
         nn.ReLU(),
-        nn.Linear(x//16,x//16),
+        nn.Linear(x//8,x//8),
         nn.ReLU(),
-        nn.Linear(x//16,x//16),
+        nn.Linear(x//8,x//8),
         nn.ReLU(),
-        nn.Linear(x//16,y)
+        nn.Linear(x//8,y)
         )
     
     lossfun=nn.CrossEntropyLoss()
@@ -42,7 +43,7 @@ def model_builder(x,y,lrate):
 def model_trainer(data,labels,epochs,ANNclassify, lossfun, optim):
     losses = torch.zeros(epochs)
     for i in range(epochs):
-        print(f"Round {i+1} starting")
+       
         #get predictions
         yhat = ANNclassify(data)
         #calc loss and store it for plotting
@@ -53,15 +54,19 @@ def model_trainer(data,labels,epochs,ANNclassify, lossfun, optim):
         optim.zero_grad()
         loss.backward()
         optim.step()
+        print(f"Round {i+1} finished with loss: {loss}")
         
     predictions = torch.argmax(ANNclassify(data), axis =1)
     acc = torch.mean((labels==predictions).float())
-    print(acc)
+    #print(acc)
     error_chart = plt.plot(losses.detach())
     plt.xlabel("Training Round")
     plt.ylabel("Losses")
     plt.title(f"Accuracy {acc.detach()}")
     plt.savefig("Losses training data")
+    
+    
+    
 #fitted a bit for data set
 def tensorize_and_flatten(array,labels):
     data = torch.flatten(torch.tensor(array).float(),start_dim =1)
@@ -81,13 +86,26 @@ trainingset, inputsize, labels,arg_num = tensorize_and_flatten(data_dic["trainse
 
 ANNclassify, lossfun, optim = model_builder(inputsize,arg_num,lrate=0.01)
 
-model_trainer(trainingset,labels,100,ANNclassify, lossfun, optim)
+model_trainer(trainingset,labels,200,ANNclassify, lossfun, optim)
 
 #now check on testdata
 testset, x, testlabels, y = tensorize_and_flatten(data_dic["testset"], data_dic["testsetlabels"])
 prob_list = ANNclassify(testset)
 predictions = torch.argmax(prob_list, axis =1)
 acc = torch.mean((testlabels==predictions).float())
+#representation of mistakes
+error_index = np.where(predictions != testlabels)[0]
+y_detach = testlabels.detach().numpy()
+yhat_detach = predictions.detach().numpy()
+error_yhat = [yhat_detach[i] for i in error_index]
+error_y = [y_detach[i] for i in error_index]
+missed_chart = sns.histplot(x=error_y,hue=error_yhat, discrete=True, bins =np.linspace(0,9,10),palette="Set2")
+plt.xlim((-1,10))
+missed_chart.set_xticks(range(0,10))
+plt.xlabel("Actual Value")
+plt.ylabel("Losses predicted as")
+plt.title(f"Accuracy on testset {acc.detach()}")
+missed_chart.get_figure().savefig("Losses test set")
 
 # super ugly
 # test_plot = plt.plot(prob_list.detach(), "-s", markerfacecolor="w")
