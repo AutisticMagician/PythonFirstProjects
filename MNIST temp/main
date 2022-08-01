@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jul 21 12:14:16 2022
+
+@author: theautisticmagician
+"""
+#clean up follows later
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+import matplotlib.pyplot as plt
+import idx2numpy
+import seaborn as sns 
+
+
+PATH = "current_model.pt"
+
+
+#load data
+file_list = ["MNIST/t10k-images.idx3-ubyte","MNIST/t10k-labels.idx1-ubyte","MNIST/train-images.idx3-ubyte","MNIST/train-labels.idx1-ubyte" ]
+
+key_list = ["testset","testsetlabels","trainset","trainsetlabels" ]
+
+data_dic = {key_list[i]:idx2numpy.convert_from_file(file_list[i]) for i in range(4)}
+
+#rewrite sequential as model, rewrite code later and change execution order due to redundandancy
+x=784
+y=10
+layer_list = [nn.Linear(x,x//2),nn.Linear(x//2,x//2),nn.Linear(x//2,x//2),nn.Linear(x//2,x//2),nn.Linear(x//2,x//4),
+              nn.Linear(x//4,x//4),nn.Linear(x//4,x//4),nn.Linear(x//4,x//4),nn.Linear(x//4,x//8),nn.Linear(x//8,x//8),
+              nn.Linear(x//8,x//8),nn.Linear(x//8,x//16)]
+
+class mySequential(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.input = nn.Linear(x,x)
+        self.layers = nn.ModuleList(layer_list)
+        self.output = nn.Linear(x//16,y)
+        self.dr = 0.1
+    def forward(self,data):
+        x = F.relu(self.input(data))
+        
+        for layer in self.layers:
+            x = F.dropout(x,p=self.dr,training=self.training) #input and output seperate for easier dropout
+            x =  F.relu(layer(x)) #no dropout for last hidden layer so focus is on complex features
+            
+        x = self.output(x)
+        return x
+
+
+#model will be squeezed due to hardware constraints.....
+# def model_builder(x,y,lrate):
+    
+    
+#     ANNclassify = nn.Sequential(
+#         nn.Linear(x,x),
+#         nn.ReLU(),
+#         nn.Linear(x,x//2),
+#         nn.ReLU(),
+#         nn.Linear(x//2,x//2),
+#         nn.ReLU(),
+#         nn.Linear(x//2,x//2),
+#         nn.ReLU(),
+#         nn.Linear(x//2,x//2),
+#         nn.ReLU(),
+#         nn.Linear(x//2,x//4),
+#         nn.ReLU(),
+#         nn.Linear(x//4,x//4),
+#         nn.ReLU(),
+#         nn.Linear(x//4,x//4),
+#         nn.ReLU(),
+#         nn.Linear(x//4,x//4),
+#         nn.ReLU(),
+#         nn.Linear(x//4,x//8),
+#         nn.ReLU(),
+#         nn.Linear(x//8,x//8),
+#         nn.ReLU(),
+#         nn.Linear(x//8,x//8),
+#         nn.ReLU(),
+#         nn.Linear(x//8,x//16),
+#         nn.ReLU(),
+#         nn.Linear(x//16,y)
+#         )
+    
+#     lossfun=nn.CrossEntropyLoss()
+#     optim = torch.optim.SGD(ANNclassify.parameters(),lr=lrate,weight_decay=0.005)
+    
+#     return ANNclassify, lossfun, optim
+
+def model_builder_new(lrate):
+    
+    
+    ANNclassify = mySequential()
+    
+    lossfun=nn.CrossEntropyLoss()
+    optim = torch.optim.SGD(ANNclassify.parameters(),lr=lrate,weight_decay=0.001)
+    
+    return ANNclassify, lossfun, optim
+
+# def model_trainer(data,labels,epochs,ANNclassify, lossfun, optim, mode=0): 
+#     if mode == 0:
+#         try:
+#             ANNclassify.load_state_dict(torch.load(PATH))
+#             ANNclassify.eval()
+#         finally:    
+#             losses = torch.zeros(epochs)
+#             for i in range(epochs):
+               
+#                 #get predictions
+#                 yhat = ANNclassify(data)
+#                 #calc loss and store it for plotting
+#                 loss = lossfun(yhat,labels)
+#                 losses[i] = loss
+                
+#                 #backwards prop and clean up
+#                 optim.zero_grad()
+#                 loss.backward()
+#                 optim.step()
+#                 print(f"Round {i+1} finished with loss: {loss}")
+                
+#             predictions = torch.argmax(ANNclassify(data), axis =1)
+#             acc = torch.mean((labels==predictions).float())
+#             #print(acc)
+#             error_chart = plt.plot(losses.detach())
+#             plt.xlabel("Training Round")
+#             plt.ylabel("Losses")
+#             plt.title(f"Accuracy {acc.detach()}")
+#             plt.savefig("Losses training data")
+#             try:
+#                 torch.save(ANNclassify.state_dict(),PATH)
+#             finally:
+#                 pass
+
+#integrate DataLoader and rewrite accuracy to account for batching :)
+
+def model_trainer_new(loader,epochs,ANNclassify, lossfun, optim, mode=0): 
+    if mode == 0:
+        try:
+            ANNclassify.load_state_dict(torch.load(PATH))
+            ANNclassify.eval()
+        finally:   
+            ANNclassify.train()
+            losses = torch.zeros(epochs)
+            for i in range(epochs):
+                batch_accuracy = []
+                for data, labels in loader:
+                    #get predictions
+                    yhat = ANNclassify(data)
+                    #calc loss and store it for plotting
+                    loss = lossfun(yhat,labels)
+                    
+                    
+                    #backwards prop and clean up
+                    optim.zero_grad()
+                    loss.backward()
+                    optim.step()
+                    
+                    batch_accuracy.append( 100*torch.mean((torch.argmax(yhat,axis=1) == labels).float()).item() )
+                losses[i] =  np.float64(100)-np.mean(batch_accuracy,dtype=np.float64)
+                print(f"Round {i+1} finished with loss: {losses[i]}")
+            
+            ANNclassify.eval()
+            predictions = torch.argmax(ANNclassify(data), axis =1)
+            acc = torch.mean((labels==predictions).float())
+            #print(acc)
+            error_chart = plt.plot(losses.detach())
+            plt.xlabel("Training Round")
+            plt.ylabel("Losses")
+            plt.title(f"Accuracy {acc.detach()}")
+            plt.savefig("Losses training data")
+            try:
+                torch.save(ANNclassify.state_dict(),PATH)
+            finally:
+                return
+    
+    
+#fitted a bit for data set
+def tensorize_and_flatten(array,labels):
+    data = torch.flatten(torch.tensor(array).float(),start_dim =1)
+    inputsize = data.size(dim=1)
+    labels = torch.tensor(labels)
+    arg_list = torch.unique(labels).long()
+    arg_num = arg_list.size(dim=0)
+    x = data.size(dim=0)
+    y = labels.size(dim=0)
+    if x==y:
+        return data,inputsize, labels, arg_num
+    else:
+        raise Exception("Set size does not match label size")
+
+
+trainingset, inputsize, labels,arg_num = tensorize_and_flatten(data_dic["trainset"],data_dic["trainsetlabels"])
+training_data = torch.utils.data.TensorDataset(trainingset,labels)
+#CTL 31
+training_loader = torch.utils.data.DataLoader(training_data, shuffle=True,batch_size=31,num_workers=4)
+
+ANNclassify, lossfun, optim = model_builder_new(lrate=0.01)
+
+model_trainer_new(training_loader,10,ANNclassify, lossfun, optim)
+
+#now check on testdata
+testset, x, testlabels, y = tensorize_and_flatten(data_dic["testset"], data_dic["testsetlabels"])
+
+#ANNclassify.eval() reminder for devset later on
+
+prob_list = ANNclassify(testset)
+predictions = torch.argmax(prob_list, axis =1)
+acc = torch.mean((testlabels==predictions).float())
+#representation of mistakes
+error_index = np.where(predictions != testlabels)[0]
+y_detach = testlabels.detach().numpy()
+yhat_detach = predictions.detach().numpy()
+error_yhat = [yhat_detach[i] for i in error_index]
+error_y = [y_detach[i] for i in error_index]
+missed_chart = sns.histplot(x=error_y,hue=error_yhat, discrete=True, bins =np.linspace(0,9,10),palette="Set2")
+plt.xlim((-1,10))
+missed_chart.set_xticks(range(0,10))
+plt.xlabel("Actual Value")
+plt.ylabel("Losses predicted as")
+plt.title(f"Accuracy on testset {acc.detach()}")
+missed_chart.get_figure().savefig("Losses test set")
+error_sum = len(error_index)
+print(error_sum)
+
+# super ugly
+# test_plot = plt.plot(prob_list.detach(), "-s", markerfacecolor="w")
+# plt.xlabel('label nr')
+# plt.ylabel('Probability')
+# plt.legend(["0","1","2","3","4","5","6","7","8","9"])
+# plt.title(f"final acc:{acc.detach()}")
+
+
+
+#ToDo: More decimal places for accuracy and losses on the test-set, create a devset for further cross-validation
